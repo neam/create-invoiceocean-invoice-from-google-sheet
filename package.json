@@ -9,9 +9,17 @@
   },
   "author": "",
   "dependencies": {
-    "argparse": "^1.0.10"
+    "argparse": "^1.0.10",
+    "babel-polyfill": "^6.26.0",
+    "babel-register": "^6.26.0",
+    "es6-promisify": "^6.0.0",
+    "googleapis": "^27.0.0",
+    "mz": "^2.7.0",
+    "node-fetch": "^2.2.0"
   },
   "devDependencies": {
+    "async": "^2.6.1",
+    "babel-preset-env": "^1.7.0",
     "dotenv": "^6.0.0",
     "prettier": "^1.14.3"
   }

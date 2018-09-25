@@ -1,24 +1,8 @@
-require("dotenv").load();
-
-// Parse cli arguments
-const ArgumentParser = require("argparse").ArgumentParser;
-const packageInfo = require("./package.json");
-const parser = new ArgumentParser({
-  version: packageInfo.version,
-  description: packageInfo.description,
-  addHelp: true,
+// Transpile all code following this line with babel and use 'env' (aka ES6) preset.
+require("babel-register")({
+  presets: ["env"],
 });
-/*
-parser.addArgument(["-f", "--foo"], {
-  help: "Foo",
-});
-*/
-var args = parser.parseArgs();
-console.dir(args);
+require("babel-polyfill");
 
-// Initialize settings from .env
-const foo = process.env.FOO || "foo";
-
-const run = async () => {};
-
-run();
+// Import the rest of our application.
+module.exports = require("./invoiceocean-invoice-importer.js");
