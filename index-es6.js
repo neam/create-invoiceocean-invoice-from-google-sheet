@@ -71,7 +71,7 @@ const run = async () => {
   try {
     // Create the invoice on invoiceocean.com
     const createdInvoice = await invoiceOcean.createInvoice(invoice);
-    console.log("createdInvoice", createdInvoice);
+    console.log("Created invoice: ", createdInvoice);
 
     // Download invoice as PDF
     const destinationPath = `./${sheetName}.pdf`;
@@ -85,6 +85,25 @@ const run = async () => {
 
 function gsheetRowsToInvoiceOceanObjects(rows) {
   // console.log("rows", rows);
+
+  const removeUndefinedProperties = obj => {
+    Object.keys(obj).forEach(key => obj[key] === undefined && delete obj[key]);
+  };
+
+  const convertExcelDates = obj => {
+    Object.keys(obj).forEach(key => {
+      obj[key] =
+        key.indexOf("_date") > -1 || key.indexOf("payment_to") > -1
+          ? excelDateToJSDate(obj[key])
+              .toISOString()
+              .slice(0, 10)
+          : obj[key];
+    });
+  };
+
+  function excelDateToJSDate(excelDate) {
+    return new Date(Math.round((excelDate - 25569) * 86400 * 1000));
+  }
 
   let currentItemType = null;
   let currentRowType = null;
@@ -103,6 +122,8 @@ function gsheetRowsToInvoiceOceanObjects(rows) {
     } else {
       const values = element.slice(1);
       const object = zipObject(currentHeaders, values);
+      removeUndefinedProperties(object);
+      convertExcelDates(object);
       invoiceOceanObjects[currentItemType].push(object);
     }
   });

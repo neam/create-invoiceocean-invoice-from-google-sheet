@@ -129,10 +129,7 @@ export class InvoiceOceanApi {
       invoice: stringValuesOnly(invoice),
     };
 
-    console.log(
-      "Creating invoice using the following payload: ",
-      stringValuesOnly(invoice),
-    );
+    console.log("Creating invoice using the following payload: ");
     console.dir(payload);
 
     const res = await fetch(
