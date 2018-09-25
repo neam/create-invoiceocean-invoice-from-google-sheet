@@ -1,5 +1,13 @@
 import { InvoiceOceanApi } from "./invoiceocean-api";
 import { GsheetsConnector } from "./gsheets-connector";
+import { zipObject } from "lodash";
+import fs from "fs";
+
+// Fail on error
+process.on("unhandledRejection", error => {
+  console.error(error);
+  process.exit(1);
+});
 
 // Initialize settings from .env if available
 require("dotenv").load();
@@ -12,13 +20,19 @@ const parser = new ArgumentParser({
   description: packageInfo.description,
   addHelp: true,
 });
-/*
-parser.addArgument(["-f", "--foo"], {
+parser.addArgument(["-sid", "--spreadsheetId"], {
   help: "Foo",
+  required: true,
 });
-*/
-var args = parser.parseArgs();
+parser.addArgument(["-sn", "--sheetName"], {
+  help: "Foo",
+  required: true,
+});
+const args = parser.parseArgs();
 console.log("CLI arguments: ", args);
+
+const spreadsheetId = args.spreadsheetId;
+const sheetName = args.sheetName;
 
 const INVOICEOCEAN_DOMAIN = process.env.INVOICEOCEAN_DOMAIN;
 const INVOICEOCEAN_API_TOKEN = process.env.INVOICEOCEAN_API_TOKEN;
@@ -30,23 +44,69 @@ const invoiceOcean = new InvoiceOceanApi(
 const gsheets = new GsheetsConnector();
 
 const run = async () => {
-  const clients = await invoiceOcean.fetchClients();
-  // console.log("fetchClients", clients);
-
+  /*
   const invoices = await invoiceOcean.fetchInvoices();
-  // console.log("fetchInvoices", invoices);
+  console.log("invoices", invoices);
 
   const detailedInvoices = await Promise.all(
-    invoices.map(async invoice => {
-      // console.log("invoice", invoice);
-      const detailedInvoice = await invoiceOcean.fetchInvoice(invoice.id);
-      console.log("detailedInvoice", detailedInvoice);
-      return detailedInvoice;
+    invoices.map(invoice => {
+      return invoiceOcean.fetchInvoice(invoice.id);
     }),
   );
   console.log("detailedInvoices", detailedInvoices);
+  */
 
-  await gsheets.runExample();
+  await gsheets.ensureAuthorized();
+
+  const range = `${sheetName}`;
+  const rows = await gsheets.getValues(spreadsheetId, range);
+
+  const invoiceOceanObjects = gsheetRowsToInvoiceOceanObjects(rows);
+  console.log("invoiceOceanObjects", invoiceOceanObjects);
+
+  const invoice = invoiceOceanObjects.invoice[0];
+  invoice.client = invoiceOceanObjects.client[0];
+  invoice.positions = invoiceOceanObjects.positions;
+
+  try {
+    // Create the invoice on invoiceocean.com
+    const createdInvoice = await invoiceOcean.createInvoice(invoice);
+    console.log("createdInvoice", createdInvoice);
+
+    // Download invoice as PDF
+    const destinationPath = `./${sheetName}.pdf`;
+    const destinationStream = fs.createWriteStream(destinationPath);
+    invoiceOcean.downloadInvoiceToStream(createdInvoice.id, destinationStream);
+    console.log(`Invoice downloaded to ${destinationPath}`);
+  } catch (err) {
+    console.error(err);
+  }
 };
+
+function gsheetRowsToInvoiceOceanObjects(rows) {
+  // console.log("rows", rows);
+
+  let currentItemType = null;
+  let currentRowType = null;
+  let currentHeaders = null;
+  let invoiceOceanObjects = {};
+  rows.forEach(function(element) {
+    if (element[0]) {
+      currentItemType = element[0];
+      invoiceOceanObjects[currentItemType] = [];
+      currentRowType = "header";
+      return;
+    }
+    if (currentRowType === "header") {
+      currentHeaders = element.slice(1);
+      currentRowType = "data";
+    } else {
+      const values = element.slice(1);
+      const object = zipObject(currentHeaders, values);
+      invoiceOceanObjects[currentItemType].push(object);
+    }
+  });
+  return invoiceOceanObjects;
+}
 
 run();

@@ -92,26 +92,36 @@ export class GsheetsConnector {
     console.log(`Token stored to ${TOKEN_PATH}`);
   }
 
+  async getValues(spreadsheetId, range) {
+    const auth = this.auth;
+    try {
+      const sheets = google.sheets("v4");
+      const getValues = promisify(sheets.spreadsheets.values.get);
+      const valueRenderOption = "UNFORMATTED_VALUE";
+      const res = await getValues({
+        auth,
+        spreadsheetId,
+        range,
+        valueRenderOption,
+      });
+      return res.data.values;
+    } catch (err) {
+      console.log(`The API returned an error: ${err}`);
+      throw err;
+    }
+  }
+
   /**
    * Prints the names and majors of students in a sample spreadsheet:
    * @see https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
    * @param {google.auth.OAuth2} auth The authenticated Google OAuth client.
    */
   async listMajorsExample() {
-    const auth = this.auth;
-    try {
-      const sheets = google.sheets("v4");
-      const getValues = promisify(sheets.spreadsheets.values.get);
-      const spreadsheetId = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms";
-      const range = "Class Data!A2:E";
-      const response = await getValues({ auth, spreadsheetId, range });
-    } catch (err) {
-      console.log(`The API returned an error: ${err}`);
-      return;
-    }
-    console.log("response", response.data);
-    const rows = response.data.values;
-    if (rows.length == 0) {
+    const spreadsheetId = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms";
+    const range = "Class Data!A2:E";
+    const rows = await this.getValues(spreadsheetId, range);
+    console.log("rows", rows);
+    if (rows.length === 0) {
       console.log("No data found.");
       return;
     }

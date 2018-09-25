@@ -1,5 +1,14 @@
 import fetch from "node-fetch";
 
+function stringValuesOnly(myObj) {
+  Object.keys(myObj).forEach(function(key) {
+    typeof myObj[key] == "object"
+      ? stringValuesOnly(myObj[key])
+      : (myObj[key] = String(myObj[key]));
+  });
+  return myObj;
+}
+
 export class InvoiceOceanApi {
   constructor(INVOICEOCEAN_DOMAIN, INVOICEOCEAN_API_TOKEN) {
     this.INVOICEOCEAN_DOMAIN = INVOICEOCEAN_DOMAIN;
@@ -21,9 +30,7 @@ export class InvoiceOceanApi {
     const res = await fetch(
       `https://${
         this.INVOICEOCEAN_DOMAIN
-      }.invoiceocean.com/clients.json?external_id=${id}&api_token=${
-        this.INVOICEOCEAN_API_TOKEN
-      }`,
+      }.invoiceocean.com/{id}.json?&api_token=${this.INVOICEOCEAN_API_TOKEN}`,
     );
     return await res.json();
   }
@@ -50,72 +57,105 @@ export class InvoiceOceanApi {
     return await res.json();
   }
 
-  async todo() {
-    //       "client_id": 11063048,
+  async downloadInvoiceToStream(id, destinationStream) {
+    const res = await fetch(
+      `https://${
+        this.INVOICEOCEAN_DOMAIN
+      }.invoiceocean.com/invoices/${id}.pdf?api_token=${
+        this.INVOICEOCEAN_API_TOKEN
+      }`,
+    );
+    await res.body.pipe(destinationStream);
+  }
 
-    /*
-    Adding client
-    curl https://${INVOICEOCEAN_DOMAIN}.invoiceocean.com/clients.json
-                  -H 'Accept: application/json'
-                  -H 'Content-Type: application/json'
-                  -d '{"api_token": "${INVOICEOCEAN_API_TOKEN}",
-                      "client": {
-                          "name": "Client1",
-                          "tax_no": "5252445767",
-                          "bank" : "bank1",
-                          "bank_account" : "bank_account1",
-                          "city" : "city1",
-                          "country" : "",
-                          "email" : "example@email.com",
-                          "person" : "person1",
-                          "post_code" : "post-code1",
-                          "phone" : "phone1",
-                          "street" : "street1",
-                          "street_no" : "street-no1"
-                      }}'
+  async createClientIfNotExists(client) {
+    const clients = await this.fetchClients();
 
-     */
+    // Consider a client to exist
+    const existingClients = clients.filter(c => c.name === client.name);
 
+    if (existingClients.length > 1) {
+      console.log("existingClients", existingClients);
+      throw new Error(
+        "More than one existing clients found - adjust in InvoiceOcean.com and try again",
+      );
+    }
+
+    if (existingClients.length === 1) {
+      return existingClients[0];
+    }
+
+    return await this.createClient(client);
+  }
+
+  async createClient(client) {
     const payload = {
-      api_token: INVOICEOCEAN_API_TOKEN,
-      invoice: {
-        sell_date: "2013-02-07",
-        issue_date: "2013-02-07",
-        payment_to: "2013-02-14",
-        /*
-        "kind": "vat",
-        "number": null,
-        "seller_name": "Wystawca Sp. z o.o.",
-        "seller_tax_no": "5252445767",
-        "buyer_name": "Klient1 Sp. z o.o.",
-        "buyer_tax_no": "5252445767",
-
-        "payment_to_kind": 5,
-        "department_id": 323858,
-        */
-        client_id: 11063048,
-        positions: [
-          {
-            name: "Produkt A1",
-            tax: 23,
-            total_price_gross: 10.23,
-            quantity: 1,
-          },
-          {
-            name: "Produkt A2",
-            tax: 0,
-            total_price_gross: 50,
-            quantity: 3,
-          },
-        ],
-      },
+      api_token: this.INVOICEOCEAN_API_TOKEN,
+      client: stringValuesOnly(client),
     };
 
-    const jsonString = JSON.stringify(payload);
+    const res = await fetch(
+      `https://${this.INVOICEOCEAN_DOMAIN}.invoiceocean.com/clients.json`,
+      {
+        method: "post",
+        body: JSON.stringify(payload),
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-    const endPoint = `https://${INVOICEOCEAN_DOMAIN}.invoiceocean.com/invoices.json -H 'Accept: application/json' -H 'Content-Type: application/json' -d '${jsonString}'`;
+    const json = await res.json();
 
-    // Download invoice as PDF
-    // curl "https://${INVOICEOCEAN_DOMAIN}.invoiceocean.com/invoices/100.pdf?api_token=${INVOICEOCEAN_API_TOKEN}"
+    if (json.code && json.code === "error") {
+      console.error("InvoiceOcean API error - createClient: ", json);
+      throw new Error(`InvoiceOcean API error - createClient: ${json.message}`);
+    }
+
+    return json;
+  }
+
+  async createInvoice(invoice) {
+    if (invoice.client) {
+      const client = await this.createClientIfNotExists(invoice.client);
+      invoice.client_id = client.id;
+      invoice.buyer_name = client.name;
+      delete invoice.client;
+    }
+
+    const payload = {
+      api_token: this.INVOICEOCEAN_API_TOKEN,
+      invoice: stringValuesOnly(invoice),
+    };
+
+    console.log(
+      "Creating invoice using the following payload: ",
+      stringValuesOnly(invoice),
+    );
+    console.dir(payload);
+
+    const res = await fetch(
+      `https://${this.INVOICEOCEAN_DOMAIN}.invoiceocean.com/invoices.json`,
+      {
+        method: "post",
+        body: JSON.stringify(payload),
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    const json = await res.json();
+
+    if (json.code && json.code === "error") {
+      console.error("InvoiceOcean API error - createInvoice: ", json);
+      throw new Error(
+        `InvoiceOcean API error - createInvoice: ${json.message}`,
+      );
+    }
+
+    return json;
   }
 }
