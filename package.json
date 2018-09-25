@@ -1,5 +1,5 @@
 {
-  "name": "invoiceocean-invoice-importer",
+  "name": "create-invoiceocean-invoice-from-google-sheet",
   "version": "0.1.0",
   "description": "",
   "main": "index.js",

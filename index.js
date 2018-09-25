@@ -5,4 +5,4 @@ require("babel-register")({
 require("babel-polyfill");
 
 // Import the rest of our application.
-module.exports = require("./invoiceocean-invoice-importer.js");
+module.exports = require("./index-es6.js");
