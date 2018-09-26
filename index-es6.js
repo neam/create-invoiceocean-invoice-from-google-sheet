@@ -44,18 +44,6 @@ const invoiceOcean = new InvoiceOceanApi(
 const gsheets = new GsheetsConnector();
 
 const run = async () => {
-  /*
-  const invoices = await invoiceOcean.fetchInvoices();
-  console.log("invoices", invoices);
-
-  const detailedInvoices = await Promise.all(
-    invoices.map(invoice => {
-      return invoiceOcean.fetchInvoice(invoice.id);
-    }),
-  );
-  console.log("detailedInvoices", detailedInvoices);
-  */
-
   await gsheets.ensureAuthorized();
 
   const range = `${sheetName}`;
@@ -70,8 +58,8 @@ const run = async () => {
 
   try {
     // Create the invoice on invoiceocean.com
-    const createdInvoice = await invoiceOcean.createInvoice(invoice);
-    console.log("Created invoice: ", createdInvoice);
+    const createdInvoice = await invoiceOcean.createInvoiceIfNotExists(invoice);
+    console.log("The invoice: ", createdInvoice);
 
     // Download invoice as PDF
     const destinationPath = `./${sheetName}.pdf`;
@@ -105,6 +93,15 @@ function gsheetRowsToInvoiceOceanObjects(rows) {
     return new Date(Math.round((excelDate - 25569) * 86400 * 1000));
   }
 
+  function stringValuesOnly(myObj) {
+    Object.keys(myObj).forEach(function(key) {
+      typeof myObj[key] == "object"
+        ? stringValuesOnly(myObj[key])
+        : (myObj[key] = String(myObj[key]));
+    });
+    return myObj;
+  }
+
   let currentItemType = null;
   let currentRowType = null;
   let currentHeaders = null;
@@ -124,6 +121,7 @@ function gsheetRowsToInvoiceOceanObjects(rows) {
       const object = zipObject(currentHeaders, values);
       removeUndefinedProperties(object);
       convertExcelDates(object);
+      stringValuesOnly(object);
       invoiceOceanObjects[currentItemType].push(object);
     }
   });

@@ -1,14 +1,5 @@
 import fetch from "node-fetch";
 
-function stringValuesOnly(myObj) {
-  Object.keys(myObj).forEach(function(key) {
-    typeof myObj[key] == "object"
-      ? stringValuesOnly(myObj[key])
-      : (myObj[key] = String(myObj[key]));
-  });
-  return myObj;
-}
-
 export class InvoiceOceanApi {
   constructor(INVOICEOCEAN_DOMAIN, INVOICEOCEAN_API_TOKEN) {
     this.INVOICEOCEAN_DOMAIN = INVOICEOCEAN_DOMAIN;
@@ -82,6 +73,9 @@ export class InvoiceOceanApi {
     }
 
     if (existingClients.length === 1) {
+      console.log(
+        "Found existing client, not creating a new one (nor updating the existing)",
+      );
       return existingClients[0];
     }
 
@@ -91,7 +85,7 @@ export class InvoiceOceanApi {
   async createClient(client) {
     const payload = {
       api_token: this.INVOICEOCEAN_API_TOKEN,
-      client: stringValuesOnly(client),
+      client: client,
     };
 
     const res = await fetch(
@@ -116,6 +110,39 @@ export class InvoiceOceanApi {
     return json;
   }
 
+  async createInvoiceIfNotExists(invoice) {
+    const invoices = await this.fetchInvoices();
+    // console.log("invoices", invoices);
+
+    /*
+    const detailedInvoices = await Promise.all(
+        invoices.map(invoice => {
+            return invoiceOcean.fetchInvoice(invoice.id);
+        }),
+    );
+    console.log("detailedInvoices", detailedInvoices);
+    */
+
+    // Consider a invoice to exist if the number is the same
+    const existingInvoices = invoices.filter(i => i.number === invoice.number);
+
+    if (existingInvoices.length > 1) {
+      console.log("existingInvoices", existingInvoices);
+      throw new Error(
+        "More than one existing invoices found - adjust in InvoiceOcean.com and try again",
+      );
+    }
+
+    if (existingInvoices.length === 1) {
+      console.log(
+        "Found existing invoice, not creating a new one (nor updating the existing)",
+      );
+      return existingInvoices[0];
+    }
+
+    return await this.createInvoice(invoice);
+  }
+
   async createInvoice(invoice) {
     if (invoice.client) {
       const client = await this.createClientIfNotExists(invoice.client);
@@ -126,7 +153,7 @@ export class InvoiceOceanApi {
 
     const payload = {
       api_token: this.INVOICEOCEAN_API_TOKEN,
-      invoice: stringValuesOnly(invoice),
+      invoice: invoice,
     };
 
     console.log("Creating invoice using the following payload: ");
