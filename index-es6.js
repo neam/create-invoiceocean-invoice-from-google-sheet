@@ -81,7 +81,7 @@ function gsheetRowsToInvoiceOceanObjects(rows) {
   const convertExcelDates = obj => {
     Object.keys(obj).forEach(key => {
       obj[key] =
-        key.indexOf("_date") > -1 || key.indexOf("payment_to") > -1
+        key.indexOf("_date") > -1 || key === "payment_to" > -1
           ? excelDateToJSDate(obj[key])
               .toISOString()
               .slice(0, 10)
@@ -122,6 +122,10 @@ function gsheetRowsToInvoiceOceanObjects(rows) {
       removeUndefinedProperties(object);
       convertExcelDates(object);
       stringValuesOnly(object);
+      // A helper attribute set in the gsheet template which should not be used when actually creating the invoice
+      if (typeof object.quantity_unrounded !== "undefined") {
+        delete object.quantity_unrounded;
+      }
       invoiceOceanObjects[currentItemType].push(object);
     }
   });
