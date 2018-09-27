@@ -95,7 +95,7 @@ function gsheetRowsToInvoiceOceanObjects(rows) {
 
   function stringValuesOnly(myObj) {
     Object.keys(myObj).forEach(function(key) {
-      typeof myObj[key] == "object"
+      typeof myObj[key] === "object"
         ? stringValuesOnly(myObj[key])
         : (myObj[key] = String(myObj[key]));
     });
